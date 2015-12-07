@@ -23,26 +23,20 @@ if __name__ == '__main__':
         sys.exit(1)
 
     with open(args.output_header, "w") as header:
-        header.write("#ifndef _PROT_\n")
-        header.write("#define _PROT_\n\n")
-        header.write("#include <stdint.h>\n\n")
+        declarations = []
         for structure in protocol_file.STRUCTURES:
-            header.write(gen_c_struct_decl(structure))
-            header.write("\n")
+            declarations.append(gen_c_serialize_decl(structure))
+            declarations.append(gen_c_deserialize_decl(structure))
 
-        for structure in protocol_file.STRUCTURES:
-            header.write(gen_c_serialize_decl(structure))
-            header.write("\n")
-            header.write(gen_c_deserialize_decl(structure))
-        header.write("\n\n#endif\n")
-        header.close()
+        struct_declarations = [gen_c_struct_decl(structure) for structure in protocol_file.STRUCTURES]
+        header.write(header_tpl.render(struct_declarations=struct_declarations,
+                                       declarations=declarations))
 
     with open(args.output_source, "w") as source:
-        source.write("#include <stdint.h>\n")
-        source.write("#include <%s>\n\n" % args.output_header)
-
+        definitions = []
         for structure in protocol_file.STRUCTURES:
-            source.write(gen_c_serialize_def(structure))
-            source.write("\n")
+            definitions.append(gen_c_serialize_def(structure))
+
+        source.write(source_tpl.render(header=args.output_header, definitions=definitions))
 
 
