@@ -5,6 +5,7 @@ from jinja2 import Template, Environment
 jinja_env = Template("").environment
 jinja_env.trim_blocks = True
 jinja_env.lstrip_blocks = True
+
 serialize_tpl = Template("""\
 void {{ name }}_serialize({{c_type }}* in_struct, uint8_t *out_buff) {
 {% for byte in out_bytes %}{% set outer_loop = loop %}
