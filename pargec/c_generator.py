@@ -8,8 +8,8 @@ jinja_env = Environment(loader=PackageLoader('pargec', 'templates'),
                         trim_blocks=True, lstrip_blocks=True)
 
 serialize_tpl = jinja_env.get_template('serialize_def.tpl')
+deserialize_tpl = jinja_env.get_template('deserialize_def.tpl')
 header_tpl = jinja_env.get_template('header.tpl')
-source_tpl = jinja_env.get_template('header.tpl')
 source_tpl = jinja_env.get_template('source.tpl')
 python_tpl = jinja_env.get_template('python_wrapper.tpl')
 
@@ -47,7 +47,20 @@ def gen_c_serialize_def(structure):
     return out
 
 def gen_c_deserialize_def(structure):
-    pass
+    masks = build_bit_masks(structure)
+    new_masks = []
+    for field, ranges in masks:
+        ranges_ = []
+        for range_ in ranges:
+            byte, byte_first_bit, byte_last_bit, field_first_bit, field_last_bit = range_
+            mask = bin(((1 << (byte_first_bit-byte_last_bit))-1))
+            out = (byte, byte_first_bit, byte_last_bit, mask, field_last_bit)
+            ranges_.append(out)
+        new_masks.append((field, ranges_))
+
+    out = deserialize_tpl.render(name=structure.name, c_type=structure.c_type,
+                                 masks=new_masks)
+    return out
 
 def gen_c_decl(structure):
     return (self.gen_c_serialize_decl(structure) +

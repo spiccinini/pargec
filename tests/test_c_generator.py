@@ -7,6 +7,7 @@ from pargec.structure import (Structure, Field, uint8, int8,
                                FMT_BE_MSB)
 from pargec.c_generator import (gen_c_struct_decl, gen_c_serialize_decl,
                                  gen_c_deserialize_decl, gen_c_serialize_def,
+                                 gen_c_deserialize_def,
                                  gen_c_defines, generate,
                                  build_bit_masks, Byte)
 
@@ -16,6 +17,7 @@ FOO_STRUCT = """typedef struct foo_prot {
     uint8_t field3;
 } foo_prot_t;
 """
+
 FOO_DEFINES = """\
 #define FOO_PROT_SERIALIZED_N_BYTES 2
 """
@@ -31,6 +33,31 @@ void foo_prot_serialize(foo_prot_t* in_struct, uint8_t *out_buff) {
     out_buff[1] = 0;
     out_buff[1] |= (in_struct->field2 & 0b11) << 6;
     out_buff[1] |= (in_struct->field3 & 0b111111) << 0;
+}"""
+
+FOO_DESERIALIZE_DEF = """\
+void foo_prot_deserialize(foo_prot_t* out_struct, uint8_t *in_buff) {
+    out_struct->field1 = 0;
+    out_struct->field1 |= (in_buff[0] >> 2) & 0b111111;
+    out_struct->field2 = 0;
+    out_struct->field2 |= (in_buff[0] & 0b11) << 2;
+    out_struct->field2 |= (in_buff[1] >> 6) & 0b11;
+    out_struct->field3 = 0;
+    out_struct->field3 |= (in_buff[1] >> 0) & 0b111111;
+}"""
+
+MULTIBYTE_DESERIALIZE_DEF = """\
+void prot_multi_deserialize(prot_multi_t* out_struct, uint8_t *in_buff) {
+    out_struct->field1 = 0;
+    out_struct->field1 |= (in_buff[0] >> 2) & 0b111111;
+    out_struct->field2 = 0;
+    out_struct->field2 |= (in_buff[0] & 0b11) << 10;
+    out_struct->field2 |= (in_buff[1] & 0b11111111) << 2;
+    out_struct->field2 |= (in_buff[2] >> 6) & 0b11;
+    out_struct->field3 = 0;
+    out_struct->field3 |= (in_buff[2] & 0b111111) << 10;
+    out_struct->field3 |= (in_buff[3] & 0b11111111) << 2;
+    out_struct->field3 |= (in_buff[4] >> 6) & 0b11;
 }"""
 
 MULTIBYTE_SERIALIZE_DEF = """\
@@ -71,6 +98,10 @@ class TestCGenerator(unittest.TestCase):
     def test_gen_c_serialize_def(self):
         self.assertEqual(gen_c_serialize_def(self.foo_prot), FOO_SERIALIZE_DEF)
 
+    def test_gen_c_deserialize_def(self):
+        self.maxDiff = None
+        self.assertEqual(gen_c_deserialize_def(self.foo_prot), FOO_DESERIALIZE_DEF)
+
     def test_gen_c_defines(self):
         self.assertEqual(gen_c_defines(self.foo_prot), FOO_DEFINES)
 
@@ -89,7 +120,6 @@ class TestCGenerator(unittest.TestCase):
         self.assertEqual(res, masks)
 
     def test_bit_masks_multibyte(self):
-
         prot = Structure("prot_multi", [
             Field("field1", uint8, 6, FMT_BE_MSB),
             Field("field2", uint8, 12, FMT_BE_MSB),
@@ -105,7 +135,7 @@ class TestCGenerator(unittest.TestCase):
         self.assertEqual(res, masks)
         self.maxDiff = None
         self.assertEqual(gen_c_serialize_def(prot), MULTIBYTE_SERIALIZE_DEF)
-
+        self.assertEqual(gen_c_deserialize_def(prot), MULTIBYTE_DESERIALIZE_DEF)
 
     def test_byte(self):
         byte = Byte()
