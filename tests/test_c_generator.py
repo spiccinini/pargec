@@ -7,6 +7,7 @@ from pargec.structure import (Structure, Field, uint8, int8,
                                FMT_BE_MSB)
 from pargec.c_generator import (gen_c_struct_decl, gen_c_serialize_decl,
                                  gen_c_deserialize_decl, gen_c_serialize_def,
+                                 gen_c_defines, generate,
                                  build_bit_masks, Byte)
 
 FOO_STRUCT = """typedef struct foo_prot {
@@ -14,6 +15,9 @@ FOO_STRUCT = """typedef struct foo_prot {
     uint8_t field2;
     uint8_t field3;
 } foo_prot_t;
+"""
+FOO_DEFINES = """\
+#define FOO_PROT_SERIALIZED_N_BYTES 2
 """
 
 FOO_SERIALIZE_DECL = "void foo_prot_serialize(foo_prot_t* in_struct, uint8_t *out_buff);"
@@ -66,6 +70,9 @@ class TestCGenerator(unittest.TestCase):
 
     def test_gen_c_serialize_def(self):
         self.assertEqual(gen_c_serialize_def(self.foo_prot), FOO_SERIALIZE_DEF)
+
+    def test_gen_c_defines(self):
+        self.assertEqual(gen_c_defines(self.foo_prot), FOO_DEFINES)
 
     def test_bit_masks_inside_byte(self):
         prot = Structure("foo_prot", [
@@ -147,10 +154,21 @@ class TestCGenerator(unittest.TestCase):
 
         from _test_online_cffi import lib, ffi as nffi
         buffer_out = nffi.new("uint8_t[]", 100)
-        asd = nffi.new("foo_prot_t *", [0b100001, 0b1111, 0b11])
-        lib.foo_prot_serialize(asd, buffer_out)
+        foo_prot = nffi.new("foo_prot_t *", [0b100001, 0b1111, 0b11])
+        lib.foo_prot_serialize(foo_prot, buffer_out)
         self.assertEqual(buffer_out[0], (0b100001 << 2) | 0b11 )
         self.assertEqual(buffer_out[1], (0b11 << 6) | 0b11 )
+
+    def test_generate(self):
+        TESTS_PATH = os.path.dirname(os.path.realpath(__file__))
+        protocol_file = os.path.join(TESTS_PATH, "struct_defs.py")
+        generate(protocol_file, os.path.join(TESTS_PATH, "foo.h"),
+                 os.path.join(TESTS_PATH, "foo.c"),
+                 os.path.join(TESTS_PATH, "foo.py"))
+        import foo
+        out_buff = foo.foo_prot_serialize({"field1": 0b100001, "field2":0b1111, "field3":0b11})
+        self.assertEqual(out_buff, bytes([(0b100001 << 2) | 0b11, (0b11 << 6) | 0b11]))
+
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
+import imp
+import math
 from collections import defaultdict
-from jinja2 import Template, Environment
+from jinja2 import Template, Environment, PackageLoader
 
 
 jinja_env = Template("").environment
@@ -105,3 +107,69 @@ def build_bit_masks(structure):
         result.append((field.name, field_bits))
     return result
 
+def gen_c_defines(structure):
+    n_bytes = structure.get_serialized_n_bytes()
+    return "#define %s_SERIALIZED_N_BYTES %d\n" % (structure.name.upper(), n_bytes)
+
+
+jinja_env = Environment(loader=PackageLoader('pargec', 'templates'))
+
+header_tpl = Template("""\
+#ifndef _PROT_
+#define _PROT_
+
+{{ defines }}
+
+{% for struct_decl in struct_declarations %}
+{{ struct_decl }}
+{% endfor %}
+
+{% for declaration in declarations %}
+{{ declaration }}
+{% endfor %}
+
+#endif
+""")
+
+source_tpl = Template("""\
+#include <stdint.h>
+#include <{{ header }}>
+
+{% for definition in definitions %}
+{{ definition }}
+{% endfor %}
+""")
+
+python_tpl = jinja_env.get_template('python_wrapper.tpl')
+
+def generate(protocol_file, output_header, output_source, output_python=None):
+    protocol_file = imp.load_source('protocol_file', protocol_file)
+    try:
+        protocol_file.STRUCTURES
+    except AttributeError:
+        sys.stderr.write("protocol_file must contain STRUCTURES list")
+        sys.exit(1)
+
+    struct_declarations = [gen_c_struct_decl(structure) for structure in protocol_file.STRUCTURES]
+    defines = [gen_c_defines(structure) for structure in protocol_file.STRUCTURES]
+    declarations = []
+    for structure in protocol_file.STRUCTURES:
+        declarations.append(gen_c_serialize_decl(structure))
+        #declarations.append(gen_c_deserialize_decl(structure))
+
+    definitions = []
+    for structure in protocol_file.STRUCTURES:
+        definitions.append(gen_c_serialize_def(structure))
+
+    with open(output_header, "w") as header:
+        header.write(header_tpl.render(struct_declarations=struct_declarations,
+                                       declarations=declarations, defines=defines))
+
+    with open(output_source, "w") as source:
+        source.write(source_tpl.render(header=output_header, definitions=definitions))
+
+    if output_python:
+        with open(output_python, "w") as python:
+            source =  "\n".join(defines) + "\n".join(struct_declarations) + "\n".join(definitions)
+            python.write(python_tpl.render(struct_declarations=struct_declarations, name='_proto',
+                              declarations=declarations, source=source, structures=protocol_file.STRUCTURES))
