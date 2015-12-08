@@ -14,3 +14,6 @@ class StructureTestCase(unittest.TestCase):
             ])
         self.assertEqual(len(foo_prot.fields), 4)
 
+        self.assertEqual(foo_prot.get_serialized_n_bits(), 16)
+        self.assertEqual(foo_prot.get_serialized_n_bytes(), 2)
+

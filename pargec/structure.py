@@ -1,4 +1,4 @@
-
+import math
 FMT_BE_MSB = 0
 
 class Structure(object):
@@ -6,6 +6,12 @@ class Structure(object):
         self.name = name
         self.fields = fields
         self.c_type = c_type or "%s_t" % name
+
+    def get_serialized_n_bits(self):
+        return sum([field.serialized_n_bits for field in self.fields])
+
+    def get_serialized_n_bytes(self):
+        return math.ceil(self.get_serialized_n_bits() / 8.)
 
 
 class Field(object):
