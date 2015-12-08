@@ -4,24 +4,14 @@ from collections import defaultdict
 from jinja2 import Template, Environment, PackageLoader
 
 
-jinja_env = Template("").environment
-jinja_env.trim_blocks = True
-jinja_env.lstrip_blocks = True
+jinja_env = Environment(loader=PackageLoader('pargec', 'templates'),
+                        trim_blocks=True, lstrip_blocks=True)
 
-serialize_tpl = Template("""\
-void {{ name }}_serialize({{c_type }}* in_struct, uint8_t *out_buff) {
-{% for byte in out_bytes %}{% set outer_loop = loop %}
-    out_buff[{{ loop.index0 }}] = 0;
-    {% for field, first, last, mask, field_last_bit in byte %}
-       {% if field_last_bit %}
-    out_buff[{{ outer_loop.index0 }}] |= (in_struct->{{field}} & {{ mask }}) >> {{ field_last_bit }};
-       {% else %}
-    out_buff[{{ outer_loop.index0 }}] |= (in_struct->{{field}} & {{ mask }}) << {{ last }};
-       {% endif %}
-    {% endfor %}
-{% endfor %}
-}""")
-
+serialize_tpl = jinja_env.get_template('serialize_def.tpl')
+header_tpl = jinja_env.get_template('header.tpl')
+source_tpl = jinja_env.get_template('header.tpl')
+source_tpl = jinja_env.get_template('source.tpl')
+python_tpl = jinja_env.get_template('python_wrapper.tpl')
 
 def gen_c_serialize_decl(structure):
     return "void %s_serialize(%s* in_struct, uint8_t *out_buff);" % (
@@ -110,37 +100,6 @@ def build_bit_masks(structure):
 def gen_c_defines(structure):
     n_bytes = structure.get_serialized_n_bytes()
     return "#define %s_SERIALIZED_N_BYTES %d\n" % (structure.name.upper(), n_bytes)
-
-
-jinja_env = Environment(loader=PackageLoader('pargec', 'templates'))
-
-header_tpl = Template("""\
-#ifndef _PROT_
-#define _PROT_
-
-{{ defines }}
-
-{% for struct_decl in struct_declarations %}
-{{ struct_decl }}
-{% endfor %}
-
-{% for declaration in declarations %}
-{{ declaration }}
-{% endfor %}
-
-#endif
-""")
-
-source_tpl = Template("""\
-#include <stdint.h>
-#include <{{ header }}>
-
-{% for definition in definitions %}
-{{ definition }}
-{% endfor %}
-""")
-
-python_tpl = jinja_env.get_template('python_wrapper.tpl')
 
 def generate(protocol_file, output_header, output_source, output_python=None):
     protocol_file = imp.load_source('protocol_file', protocol_file)
