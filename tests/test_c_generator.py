@@ -189,16 +189,18 @@ class TestCGenerator(unittest.TestCase):
         self.assertEqual(buffer_out[0], (0b100001 << 2) | 0b11 )
         self.assertEqual(buffer_out[1], (0b11 << 6) | 0b11 )
 
-    def test_generate(self):
+    def test_generate_and_integration(self):
         TESTS_PATH = os.path.dirname(os.path.realpath(__file__))
         protocol_file = os.path.join(TESTS_PATH, "struct_defs.py")
         generate(protocol_file, os.path.join(TESTS_PATH, "foo.h"),
                  os.path.join(TESTS_PATH, "foo.c"),
                  os.path.join(TESTS_PATH, "foo.py"))
         import foo
-        out_buff = foo.foo_prot_serialize({"field1": 0b100001, "field2":0b1111, "field3":0b11})
+        in_data = {"field1": 0b100001, "field2":0b1111, "field3":0b11}
+        out_buff = foo.foo_prot_serialize(in_data)
         self.assertEqual(out_buff, bytes([(0b100001 << 2) | 0b11, (0b11 << 6) | 0b11]))
-
+        values = foo.foo_prot_deserialize(out_buff)
+        self.assertTrue(all([getattr(values, key) == in_data[key] for key in in_data.keys()]))
 
 
 if __name__ == "__main__":

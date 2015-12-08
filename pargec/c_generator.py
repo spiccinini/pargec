@@ -127,11 +127,12 @@ def generate(protocol_file, output_header, output_source, output_python=None):
     declarations = []
     for structure in protocol_file.STRUCTURES:
         declarations.append(gen_c_serialize_decl(structure))
-        #declarations.append(gen_c_deserialize_decl(structure))
+        declarations.append(gen_c_deserialize_decl(structure))
 
     definitions = []
     for structure in protocol_file.STRUCTURES:
         definitions.append(gen_c_serialize_def(structure))
+        definitions.append(gen_c_deserialize_def(structure))
 
     with open(output_header, "w") as header:
         header.write(header_tpl.render(struct_declarations=struct_declarations,

@@ -23,4 +23,11 @@ def foo_prot_serialize(dict_values):
 
     lib.foo_prot_serialize(foo_prot, buffer_out)
     return bytes(ffi.buffer(buffer_out, {{ struct.get_serialized_n_bytes() }}))
+
+def foo_prot_deserialize(data_bytes):
+    foo_prot = ffi.new("foo_prot_t *")
+    buffer_in = ffi.new("uint8_t[]", data_bytes)
+
+    lib.foo_prot_deserialize(foo_prot, buffer_in)
+    return foo_prot
 {% endfor %}
