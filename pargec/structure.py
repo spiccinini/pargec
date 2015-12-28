@@ -36,6 +36,7 @@ class CEnum(CType):
 uint8 = CType("uint8_t", 8)
 int8 = CType("int8_t", 8)
 uint16 = CType("uint16_t", 16)
+uint32 = CType("uint32_t", 32)
 
 
 C_TYPES = [uint8, int8, uint16]
