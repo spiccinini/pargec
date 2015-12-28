@@ -9,4 +9,7 @@ void {{ name }}_deserialize({{c_type }}* out_struct, uint8_t *in_buff) {
        {% endif %}
     {% endfor %}
 {% endfor %}
+{% for field, first_byte, length in arrays %}
+    for(int i = 0; i < {{ length }}; ++i){out_struct->{{ field }}[i] = in_buff[{{ first_byte }}+i];}
+{% endfor %}
 }

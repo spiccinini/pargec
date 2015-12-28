@@ -25,25 +25,42 @@ def gen_c_deserialize_decl(structure):
 def gen_c_struct_decl(structure):
     out = "typedef struct %s {\n" % structure.name
     for field in structure.fields:
-        out += "    %s %s;\n" % (field.struct_c_type.c_type, field.name)
+        out += "    %s;\n" % field.get_c_type_str()
     out += "} %s;\n" % structure.c_type
     return out
+
+def _build_arrays(structure):
+    # arrays
+    arrays = []
+    for field in structure.fields:
+        if hasattr(field, "ARRAY"):
+            first_byte = structure.field_bit_position(field) // 8
+            length = field.serialized_n_bits // 8
+            arrays.append((field.name, first_byte, length))
+    return arrays
 
 def gen_c_serialize_def(structure):
     masks = build_bit_masks(structure)
     out_bytes = []
+    last_byte = None
     for field, ranges in masks:
         for range_ in ranges:
             byte, byte_first_bit, byte_last_bit, field_first_bit, field_last_bit = range_
             mask = bin(((1 << (field_first_bit-field_last_bit))-1) << field_last_bit)
-            out = (field, byte_first_bit, byte_last_bit, mask, field_last_bit)
-            if len(out_bytes) == byte:
+            empty = byte != last_byte
+            out = (field, byte, byte_first_bit, byte_last_bit, mask, field_last_bit, empty)
+
+            if empty:
                 out_bytes.append([out])
             else:
-                out_bytes[byte].append(out)
+                out_bytes[-1].append(out)
+
+            last_byte = byte
+
+    arrays = _build_arrays(structure)
 
     out = serialize_tpl.render(name=structure.name, c_type=structure.c_type,
-                                 out_bytes=out_bytes)
+                               out_bytes=out_bytes, arrays=arrays)
     return out
 
 def gen_c_deserialize_def(structure):
@@ -58,8 +75,10 @@ def gen_c_deserialize_def(structure):
             ranges_.append(out)
         new_masks.append((field, ranges_))
 
+    arrays = _build_arrays(structure)
+
     out = deserialize_tpl.render(name=structure.name, c_type=structure.c_type,
-                                 masks=new_masks)
+                                 masks=new_masks, arrays=arrays)
     return out
 
 def gen_c_decl(structure):
@@ -95,6 +114,10 @@ def build_bit_masks(structure):
     current_byte = Byte()
     result = []
     for field in structure.fields:
+        if hasattr(field, "ARRAY"): # skip arrays
+            byte += field.serialized_n_bits//8
+            continue
+
         field_bits_to_serialize = field.serialized_n_bits
         field_bits = []
         while field_bits_to_serialize > 0:

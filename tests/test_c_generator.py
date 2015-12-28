@@ -3,7 +3,7 @@ import unittest
 import subprocess
 from tempfile import NamedTemporaryFile
 
-from pargec.structure import (Structure, Field, uint8, int8,
+from pargec.structure import (Structure, Field, ArrayField, uint8, int8,
                                FMT_BE_MSB)
 from pargec.c_generator import (gen_c_struct_decl, gen_c_serialize_decl,
                                  gen_c_deserialize_decl, gen_c_serialize_def,
@@ -15,11 +15,13 @@ FOO_STRUCT = """typedef struct foo_prot {
     uint8_t field1;
     uint8_t field2;
     uint8_t field3;
+    uint8_t buff[8];
+    uint8_t field4;
 } foo_prot_t;
 """
 
 FOO_DEFINES = """\
-#define FOO_PROT_SERIALIZED_N_BYTES 2
+#define FOO_PROT_SERIALIZED_N_BYTES 11
 """
 
 FOO_SERIALIZE_DECL = "void foo_prot_serialize(foo_prot_t* in_struct, uint8_t *out_buff);"
@@ -33,6 +35,9 @@ void foo_prot_serialize(foo_prot_t* in_struct, uint8_t *out_buff) {
     out_buff[1] = 0;
     out_buff[1] |= (in_struct->field2 & 0b11) << 6;
     out_buff[1] |= (in_struct->field3 & 0b111111) << 0;
+    out_buff[10] = 0;
+    out_buff[10] |= (in_struct->field4 & 0b11111111) << 0;
+    for(int i = 0; i < 8; ++i){out_buff[2+i] = in_struct->buff[i];}
 }"""
 
 FOO_DESERIALIZE_DEF = """\
@@ -44,6 +49,9 @@ void foo_prot_deserialize(foo_prot_t* out_struct, uint8_t *in_buff) {
     out_struct->field2 |= (in_buff[1] >> 6) & 0b11;
     out_struct->field3 = 0;
     out_struct->field3 |= (in_buff[1] >> 0) & 0b111111;
+    out_struct->field4 = 0;
+    out_struct->field4 |= (in_buff[10] >> 0) & 0b11111111;
+    for(int i = 0; i < 8; ++i){out_struct->buff[i] = in_buff[2+i];}
 }"""
 
 MULTIBYTE_DESERIALIZE_DEF = """\
@@ -76,14 +84,25 @@ void prot_multi_serialize(prot_multi_t* in_struct, uint8_t *out_buff) {
     out_buff[4] |= (in_struct->field3 & 0b11) << 6;
 }"""
 
+FOO_ARRAY_STRUCT = """typedef struct foo_prot {
+    uint8_t field1;
+    uint8_t buff[64];
+} foo_prot_t;
+"""
+
 class TestCGenerator(unittest.TestCase):
     def setUpClass():
         foo_prot = Structure("foo_prot", [
             Field("field1", uint8, 6, FMT_BE_MSB),
             Field("field2", uint8, 4, FMT_BE_MSB),
             Field("field3", uint8, 6, FMT_BE_MSB),
+            ArrayField("buff", uint8, 64, FMT_BE_MSB),
+            Field("field4", uint8, 8, FMT_BE_MSB),
             ])
         TestCGenerator.foo_prot = foo_prot
+
+    def setUp(self):
+        self.maxDiff = None
 
     def test_gen_c_struct_decl(self):
         c_struct = gen_c_struct_decl(self.foo_prot)
@@ -184,10 +203,13 @@ class TestCGenerator(unittest.TestCase):
 
         from _test_online_cffi import lib, ffi as nffi
         buffer_out = nffi.new("uint8_t[]", 100)
-        foo_prot = nffi.new("foo_prot_t *", [0b100001, 0b1111, 0b11])
+        foo_prot = nffi.new("foo_prot_t *", [0b100001, 0b1111, 0b11, tuple(range(8)), 123])
         lib.foo_prot_serialize(foo_prot, buffer_out)
         self.assertEqual(buffer_out[0], (0b100001 << 2) | 0b11 )
         self.assertEqual(buffer_out[1], (0b11 << 6) | 0b11 )
+        for i in range(8):
+            self.assertEqual(buffer_out[2+i], i )
+        self.assertEqual(buffer_out[8+2], 123 )
 
     def test_generate_and_integration(self):
         TESTS_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -196,11 +218,23 @@ class TestCGenerator(unittest.TestCase):
                  os.path.join(TESTS_PATH, "foo.c"),
                  os.path.join(TESTS_PATH, "foo.py"))
         import foo
-        in_data = {"field1": 0b100001, "field2":0b1111, "field3":0b11}
+        in_data = {"field1": 0b100001, "field2":0b1111, "field3":0b11,
+                    "buff": list(range(8)), "field4": 123}
         out_buff = foo.foo_prot_serialize(in_data)
-        self.assertEqual(out_buff, bytes([(0b100001 << 2) | 0b11, (0b11 << 6) | 0b11]))
+        self.assertEqual(out_buff, bytes([(0b100001 << 2) | 0b11, (0b11 << 6) | 0b11] + list(range(8)) + [123]))
         values = foo.foo_prot_deserialize(out_buff)
-        self.assertTrue(all([getattr(values, key) == in_data[key] for key in in_data.keys()]))
+        self.assertTrue(all([getattr(values, key) == in_data[key] for key in in_data.keys() if key != "buff"]))
+        self.assertEqual(list(values.buff), in_data["buff"])
+
+    def test_multibyte(self):
+        prot = Structure("foo_prot", [
+            Field("field1", uint8, 6, FMT_BE_MSB),
+            ArrayField("buff", uint8, 8*64, FMT_BE_MSB),
+            ])
+        c_struct = gen_c_struct_decl(prot)
+
+        self.assertEqual(c_struct, FOO_ARRAY_STRUCT)
+
 
 
 if __name__ == "__main__":
