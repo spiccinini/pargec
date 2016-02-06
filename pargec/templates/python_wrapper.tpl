@@ -31,4 +31,5 @@ def {{ struct.name }}_deserialize(data_bytes):
 
     lib.{{ struct.name }}_deserialize({{ struct.c_type }}, buffer_in)
     return {{ struct.c_type }}
+
 {% endfor %}

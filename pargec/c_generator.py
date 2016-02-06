@@ -137,7 +137,7 @@ def gen_c_defines(structure):
     n_bytes = structure.get_serialized_n_bytes()
     return "#define %s_SERIALIZED_N_BYTES %d\n" % (structure.name.upper(), n_bytes)
 
-def generate(protocol_file, output_header, output_source, output_python=None):
+def generate(protocol_file, output_header, output_source, output_python=None, basename='proto'):
     protocol_file = imp.load_source('protocol_file', protocol_file)
     try:
         protocol_file.STRUCTURES
@@ -159,7 +159,8 @@ def generate(protocol_file, output_header, output_source, output_python=None):
 
     with open(output_header, "w") as header:
         header.write(header_tpl.render(struct_declarations=struct_declarations,
-                                       declarations=declarations, defines=defines))
+                                       declarations=declarations, defines=defines,
+                                       basename=basename))
 
     with open(output_source, "w") as source:
         source.write(source_tpl.render(header=output_header, definitions=definitions))
@@ -167,5 +168,5 @@ def generate(protocol_file, output_header, output_source, output_python=None):
     if output_python:
         with open(output_python, "w") as python:
             source =  "\n".join(defines) + "\n".join(struct_declarations) + "\n".join(definitions)
-            python.write(python_tpl.render(struct_declarations=struct_declarations, name='_proto',
+            python.write(python_tpl.render(struct_declarations=struct_declarations, name=basename,
                               declarations=declarations, source=source, structures=protocol_file.STRUCTURES))

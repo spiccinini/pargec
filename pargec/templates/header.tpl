@@ -1,7 +1,9 @@
-#ifndef _PROT_
-#define _PROT_
+#ifndef _{{ basename.upper() }}_
+#define _{{ basename.upper() }}_
 
-{{ defines }}
+{% for define in defines %}
+{{ define }}{% endfor %}
+
 
 {% for struct_decl in struct_declarations %}
 {{ struct_decl }}
