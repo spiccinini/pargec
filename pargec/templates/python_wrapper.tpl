@@ -11,7 +11,8 @@ ffi.cdef("""{{ declaration }}""")
 
 ffi.set_source("_{{ name }}", """\
 {{ source }}
-""")
+""", extra_compile_args=["-std=c99"])
+
 ffi.compile()
 
 from _{{ name }} import lib, ffi
