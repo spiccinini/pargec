@@ -8,7 +8,7 @@ from pargec.structure import (Structure, Field, ArrayField, uint8, int8,
 from pargec.c_generator import (gen_c_struct_decl, gen_c_serialize_decl,
                                  gen_c_deserialize_decl, gen_c_serialize_def,
                                  gen_c_deserialize_def,
-                                 gen_c_defines, generate,
+                                 gen_c_constants, generate,
                                  build_bit_masks, Byte)
 
 FOO_STRUCT = """typedef struct foo_prot {
@@ -21,7 +21,9 @@ FOO_STRUCT = """typedef struct foo_prot {
 """
 
 FOO_DEFINES = """\
-#define FOO_PROT_SERIALIZED_N_BYTES 11
+enum {
+    FOO_PROT_SERIALIZED_N_BYTES = 11,
+};
 """
 
 FOO_SERIALIZE_DECL = "void foo_prot_serialize(foo_prot_t* in_struct, uint8_t *out_buff);"
@@ -122,7 +124,7 @@ class TestCGenerator(unittest.TestCase):
         self.assertEqual(gen_c_deserialize_def(self.foo_prot), FOO_DESERIALIZE_DEF)
 
     def test_gen_c_defines(self):
-        self.assertEqual(gen_c_defines(self.foo_prot), FOO_DEFINES)
+        self.assertEqual(gen_c_constants([self.foo_prot]), FOO_DEFINES)
 
     def test_bit_masks_inside_byte(self):
         prot = Structure("foo_prot", [

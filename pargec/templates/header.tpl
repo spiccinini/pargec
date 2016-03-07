@@ -1,9 +1,7 @@
 #ifndef _{{ basename.upper() }}_
 #define _{{ basename.upper() }}_
 
-{% for define in defines %}
-{{ define }}{% endfor %}
-
+{{ constants }}
 
 {% for struct_decl in struct_declarations %}
 {{ struct_decl }}

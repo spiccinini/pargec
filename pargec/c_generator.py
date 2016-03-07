@@ -11,6 +11,7 @@ serialize_tpl = jinja_env.get_template('serialize_def.tpl')
 deserialize_tpl = jinja_env.get_template('deserialize_def.tpl')
 header_tpl = jinja_env.get_template('header.tpl')
 source_tpl = jinja_env.get_template('source.tpl')
+constants_tpl = jinja_env.get_template('constants.tpl')
 python_tpl = jinja_env.get_template('python_wrapper.tpl')
 
 def gen_c_serialize_decl(structure):
@@ -133,9 +134,8 @@ def build_bit_masks(structure):
         result.append((field.name, field_bits))
     return result
 
-def gen_c_defines(structure):
-    n_bytes = structure.get_serialized_n_bytes()
-    return "#define %s_SERIALIZED_N_BYTES %d\n" % (structure.name.upper(), n_bytes)
+def gen_c_constants(structures, prefix=''):
+    return constants_tpl.render(prefix=prefix, structures=structures)
 
 def generate(protocol_file, output_header, output_source, output_python=None, basename='proto'):
     protocol_file = imp.load_source('protocol_file', protocol_file)
@@ -146,7 +146,8 @@ def generate(protocol_file, output_header, output_source, output_python=None, ba
         sys.exit(1)
 
     struct_declarations = [gen_c_struct_decl(structure) for structure in protocol_file.STRUCTURES]
-    defines = [gen_c_defines(structure) for structure in protocol_file.STRUCTURES]
+    constants = gen_c_constants(protocol_file.STRUCTURES, prefix=basename.upper()+"_")
+
     declarations = []
     for structure in protocol_file.STRUCTURES:
         declarations.append(gen_c_serialize_decl(structure))
@@ -159,7 +160,7 @@ def generate(protocol_file, output_header, output_source, output_python=None, ba
 
     with open(output_header, "w") as header:
         header.write(header_tpl.render(struct_declarations=struct_declarations,
-                                       declarations=declarations, defines=defines,
+                                       declarations=declarations, constants=constants,
                                        basename=basename))
 
     with open(output_source, "w") as source:
@@ -167,6 +168,6 @@ def generate(protocol_file, output_header, output_source, output_python=None, ba
 
     if output_python:
         with open(output_python, "w") as python:
-            source =  "\n".join(defines) + "\n".join(struct_declarations) + "\n".join(definitions)
+            source = constants + "\n".join(struct_declarations) + "\n".join(definitions)
             python.write(python_tpl.render(struct_declarations=struct_declarations, name=basename,
                               declarations=declarations, source=source, structures=protocol_file.STRUCTURES))

@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <{{ header }}>
+#include "{{ header }}"
 
 {% for definition in definitions %}
 {{ definition }}
