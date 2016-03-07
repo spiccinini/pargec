@@ -1,4 +1,5 @@
 import os
+import imp
 import unittest
 import subprocess
 from tempfile import NamedTemporaryFile
@@ -219,7 +220,8 @@ class TestCGenerator(unittest.TestCase):
         generate(protocol_file, os.path.join(TESTS_PATH, "foo.h"),
                  os.path.join(TESTS_PATH, "foo.c"),
                  os.path.join(TESTS_PATH, "foo.py"))
-        import foo
+
+        foo = imp.load_source("foo", os.path.join(TESTS_PATH, "foo.py"))
         in_data = {"field1": 0b100001, "field2":0b1111, "field3":0b11,
                     "buff": list(range(8)), "field4": 123}
         out_buff = foo.foo_prot_serialize(in_data)

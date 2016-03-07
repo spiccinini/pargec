@@ -1,6 +1,5 @@
 import imp
-import math
-from collections import defaultdict
+import os
 from jinja2 import Template, Environment, PackageLoader
 
 
@@ -164,7 +163,7 @@ def generate(protocol_file, output_header, output_source, output_python=None, ba
                                        basename=basename))
 
     with open(output_source, "w") as source:
-        source.write(source_tpl.render(header=output_header, definitions=definitions))
+        source.write(source_tpl.render(header=os.path.basename(output_header), definitions=definitions))
 
     if output_python:
         with open(output_python, "w") as python:
