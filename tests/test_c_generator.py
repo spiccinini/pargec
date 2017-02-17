@@ -6,13 +6,12 @@ import unittest
 import subprocess
 from tempfile import NamedTemporaryFile
 
-from pargec.structure import (Structure, Field, ArrayField, uint8, int8,
-                               FMT_BE_MSB)
+from pargec.structure import (Structure, Field, ArrayField, uint8, FMT_BE_MSB)
 from pargec.c_generator import (gen_c_struct_decl, gen_c_serialize_decl,
-                                 gen_c_deserialize_decl, gen_c_serialize_def,
-                                 gen_c_deserialize_def,
-                                 gen_c_constants, generate,
-                                 build_bit_masks, Byte)
+                                gen_c_deserialize_decl, gen_c_serialize_def,
+                                gen_c_deserialize_def,
+                                gen_c_constants, generate,
+                                build_bit_masks, Byte)
 
 FOO_STRUCT = """typedef struct foo_prot {
     uint8_t field1;
@@ -95,8 +94,10 @@ FOO_ARRAY_STRUCT = """typedef struct foo_prot {
 } foo_prot_t;
 """
 
+
 class TestCGenerator(unittest.TestCase):
-    def setUpClass():
+    @classmethod
+    def setUpClass(cls):
         foo_prot = Structure("foo_prot", [
             Field("field1", uint8, 6, FMT_BE_MSB),
             Field("field2", uint8, 4, FMT_BE_MSB),
@@ -104,7 +105,7 @@ class TestCGenerator(unittest.TestCase):
             ArrayField("buff", uint8, 64, FMT_BE_MSB),
             Field("field4", uint8, 8, FMT_BE_MSB),
             ])
-        TestCGenerator.foo_prot = foo_prot
+        cls.foo_prot = foo_prot
 
     def setUp(self):
         self.maxDiff = None
@@ -214,11 +215,11 @@ class TestCGenerator(unittest.TestCase):
         buffer_out = nffi.new("uint8_t[]", 100)
         foo_prot = nffi.new("foo_prot_t *", [0b100001, 0b1111, 0b11, tuple(range(8)), 123])
         lib.foo_prot_serialize(foo_prot, buffer_out)
-        self.assertEqual(buffer_out[0], (0b100001 << 2) | 0b11 )
-        self.assertEqual(buffer_out[1], (0b11 << 6) | 0b11 )
+        self.assertEqual(buffer_out[0], (0b100001 << 2) | 0b11)
+        self.assertEqual(buffer_out[1], (0b11 << 6) | 0b11)
         for i in range(8):
-            self.assertEqual(buffer_out[2+i], i )
-        self.assertEqual(buffer_out[8+2], 123 )
+            self.assertEqual(buffer_out[2 + i], i)
+        self.assertEqual(buffer_out[8 + 2], 123)
 
     def test_generate_and_integration(self):
         TESTS_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -246,8 +247,8 @@ class TestCGenerator(unittest.TestCase):
     def test_multibyte(self):
         prot = Structure("foo_prot", [
             Field("field1", uint8, 6, FMT_BE_MSB),
-            ArrayField("buff", uint8, 8*64, FMT_BE_MSB),
-            ])
+            ArrayField("buff", uint8, 8 * 64, FMT_BE_MSB),
+        ])
         c_struct = gen_c_struct_decl(prot)
 
         self.assertEqual(c_struct, FOO_ARRAY_STRUCT)
