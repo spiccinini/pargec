@@ -1,5 +1,7 @@
 import os
 import imp
+import sys
+import tempfile
 import unittest
 import subprocess
 from tempfile import NamedTemporaryFile
@@ -195,16 +197,20 @@ class TestCGenerator(unittest.TestCase):
 
     def test_online_cffi(self):
         from cffi import FFI
+
         ffi = FFI()
         ffi.cdef(gen_c_struct_decl(self.foo_prot))
         ffi.cdef(gen_c_serialize_decl(self.foo_prot))
 
         ffi.set_source("_test_online_cffi",
-            gen_c_struct_decl(self.foo_prot)+"\n"+
-            gen_c_serialize_def(self.foo_prot))
-        ffi.compile(tmpdir='tests')
+                       gen_c_struct_decl(self.foo_prot) + "\n" +
+                       gen_c_serialize_def(self.foo_prot))
 
-        from _test_online_cffi import lib, ffi as nffi
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sys.path.append(tmpdir)
+            ffi.compile(tmpdir=tmpdir)
+            from _test_online_cffi import lib, ffi as nffi
+
         buffer_out = nffi.new("uint8_t[]", 100)
         foo_prot = nffi.new("foo_prot_t *", [0b100001, 0b1111, 0b11, tuple(range(8)), 123])
         lib.foo_prot_serialize(foo_prot, buffer_out)
@@ -217,13 +223,20 @@ class TestCGenerator(unittest.TestCase):
     def test_generate_and_integration(self):
         TESTS_PATH = os.path.dirname(os.path.realpath(__file__))
         protocol_file = os.path.join(TESTS_PATH, "struct_defs.py")
-        generate(protocol_file, os.path.join(TESTS_PATH, "foo.h"),
-                 os.path.join(TESTS_PATH, "foo.c"),
-                 os.path.join(TESTS_PATH, "foo.py"))
 
-        foo = imp.load_source("foo", os.path.join(TESTS_PATH, "foo.py"))
-        in_data = {"field1": 0b100001, "field2":0b1111, "field3":0b11,
-                    "buff": list(range(8)), "field4": 123}
+        cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.chdir(tmpdir)
+            sys.path.append(tmpdir)
+            generate(protocol_file, os.path.join(tmpdir, "foo.h"),
+                     os.path.join(tmpdir, "foo.c"),
+                     os.path.join(tmpdir, "foo.py"))
+
+            foo = imp.load_source("foo", os.path.join(tmpdir, "foo.py"))
+
+        os.chdir(cwd)
+        in_data = {"field1": 0b100001, "field2": 0b1111, "field3": 0b11,
+                   "buff": list(range(8)), "field4": 123}
         out_buff = foo.foo_prot_serialize(in_data)
         self.assertEqual(out_buff, bytes([(0b100001 << 2) | 0b11, (0b11 << 6) | 0b11] + list(range(8)) + [123]))
         values = foo.foo_prot_deserialize(out_buff)
